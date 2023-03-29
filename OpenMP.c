@@ -2,81 +2,49 @@
 #include <stdlib.h>
 #include <omp.h>
 
-int main(int argc, char *argv[]) {
-    int i, j, k;
-    int m, n, p;
-    double start_time, end_time, total_time;
+#define M 1000
+#define N 1000
 
-    printf("Enter the dimensions of matrix A (m x n): ");
-    scanf("%d %d", &m, &n);
-
-    int **a = (int **) malloc(m * sizeof(int *));
-    for (i = 0; i < m; i++) {
-        a[i] = (int *) malloc(n * sizeof(int));
-        printf("Enter row %d of matrix A: ", i+1);
-        for (j = 0; j < n; j++) {
-            scanf("%d", &a[i][j]);
-        }
+int main(int argc, char** argv) {
+  int i, j, k;
+  double start_time, end_time;
+  double** a = (double**)malloc(M * sizeof(double*));
+  double** b = (double**)malloc(N * sizeof(double*));
+  double** c = (double**)malloc(M * sizeof(double*));
+  for (i = 0; i < M; i++) {
+    a[i] = (double*)malloc(N * sizeof(double));
+    c[i] = (double*)malloc(N * sizeof(double));
+    for (j = 0; j < N; j++) {
+      a[i][j] = i + j;
+      c[i][j] = 0.0;
     }
-
-    printf("Enter the dimensions of matrix B (n x p): ");
-    scanf("%d %d", &n, &p);
-
-    int **b = (int **) malloc(n * sizeof(int *));
-    for (i = 0; i < n; i++) {
-        b[i] = (int *) malloc(p * sizeof(int));
-        printf("Enter row %d of matrix B: ", i+1);
-        for (j = 0; j < p; j++) {
-            scanf("%d", &b[i][j]);
-        }
+  }
+  for (i = 0; i < N; i++) {
+    b[i] = (double*)malloc(M * sizeof(double));
+    for (j = 0; j < M; j++) {
+      b[i][j] = i + j;
     }
-
-    int **c = (int **) malloc(m * sizeof(int *));
-    for (i = 0; i < m; i++) {
-        c[i] = (int *) malloc(p * sizeof(int));
+  }
+  start_time = omp_get_wtime();
+  #pragma omp parallel for num_threads(8) private(i,j,k) shared(a,b,c)
+  for (i = 0; i < M; i++) {
+    for (j = 0; j < N; j++) {
+      for (k = 0; k < M; k++) {
+        c[i][j] += a[i][k] * b[j][k];
+      }
     }
-
-    start_time = omp_get_wtime();
-omp_set_num_threads(8);
-
-    #pragma omp parallel for private(i,j,k)
-    for (i = 0; i < m; i++) {
-        for (j = 0; j < p; j++) {
-            int sum = 0;
-            for (k = 0; k < n; k++) {
-                sum += a[i][k] * b[k][j];
-            }
-            c[i][j] = sum;
-        }
-    }
-
-    end_time =omp_get_wtime();
-total_time = end_time - start_time;
-printf("Resultant matrix C:\n");
-for (i = 0; i < m; i++) {
-    for (j = 0; j < p; j++) {
-        printf("%d ", c[i][j]);
-    }
-    printf("\n");
-}
-
-printf("Time taken for multiplication: %lf seconds", total_time);
-
-for (i = 0; i < m; i++) {
+  }
+  end_time = omp_get_wtime();
+  printf("Elapsed time = %lf seconds\n", end_time - start_time);
+  for (i = 0; i < M; i++) {
     free(a[i]);
-}
-free(a);
-
-for (i = 0; i < n; i++) {
-    free(b[i]);
-}
-free(b);
-
-for (i = 0; i < m; i++) {
     free(c[i]);
-}
-free(c);
-
-return 0;
-
+  }
+  for (i = 0; i < N; i++) {
+    free(b[i]);
+  }
+  free(a);
+  free(b);
+  free(c);
+  return 0;
 }
