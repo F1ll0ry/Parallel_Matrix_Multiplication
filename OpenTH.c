@@ -1,114 +1,54 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <time.h>
 
-#define MAX_THREADS 8
+#define M 1000
+#define N 1000
+#define NUM_THREADS 8
 
-int rows_a, cols_a, rows_b, cols_b, rows_c, cols_c;
-int **matrix_a, **matrix_b, **result_matrix;
+double a[M][N], b[N][M], c[M][N];
+pthread_t threads[NUM_THREADS];
+int block_size;
 
-void *multiply(void *thread_arg) {
-    int tid = *((int*)thread_arg);
-    int i, j, k;
-
-    int start = tid * rows_c / MAX_THREADS;
-    int end = (tid + 1) * rows_c / MAX_THREADS;
-
-    for (i = start; i < end; i++) {
-        for (j = 0; j < cols_c; j++) {
-            result_matrix[i][j] = 0;
-            for (k = 0; k < cols_a; k++) {
-                result_matrix[i][j] += matrix_a[i][k] * matrix_b[k][j];
-            }
-        }
+void* multiply(void* arg) {
+  int thread_id = *(int*) arg;
+  int start = thread_id * block_size;
+  int end = start + block_size;
+  for (int i = start; i < end; i++) {
+    for (int j = 0; j < N; j++) {
+      for (int k = 0; k < M; k++) {
+        c[i][j] += a[i][k] * b[j][k];
+      }
     }
-
-    pthread_exit(NULL);
+  }
+  pthread_exit(NULL);
 }
 
-int main(int argc, char *argv[]) {
-    int i, j;
-    int thread_id[MAX_THREADS];
-    pthread_t threads[MAX_THREADS];
-
-    clock_t start_time, end_time;
-    double elapsed_time;
-
-    start_time = clock();
-
-    printf("Enter the dimensions of matrix A (row column): ");
-    scanf("%d %d", &rows_a, &cols_a);
-
-    matrix_a = (int**)malloc(rows_a * sizeof(int*));
-    printf("Enter the elements of matrix A:\n");
-    for (i = 0; i < rows_a; i++) {
-        matrix_a[i] = (int*)malloc(cols_a * sizeof(int));
-        for (j = 0; j < cols_a; j++) {
-            scanf("%d", &matrix_a[i][j]);
-        }
+int main(int argc, char** argv) {
+  block_size = M / NUM_THREADS;
+  for (int i = 0; i < M; i++) {
+    for (int j = 0; j < N; j++) {
+      a[i][j] = i + j;
+      c[i][j] = 0.0;
     }
-
-    printf("Enter the dimensions of matrix B (row column): ");
-    scanf("%d %d", &rows_b, &cols_b);
-
-    matrix_b = (int**)malloc(rows_b * sizeof(int*));
-for (i = 0; i < rows_b; i++) {
-matrix_b[i] = (int*)malloc(cols_b * sizeof(int));
-printf("Enter the elements of row %d of matrix B:\n", i+1);
-for (j = 0; j < cols_b; j++) {
-scanf("%d", &matrix_b[i][j]);
-}
-}
-if (cols_a != rows_b) {
-    printf("Error: The number of columns of matrix A must be equal to the number of rows of matrix B.\n");
-    return 0;
-}
-
-rows_c = rows_a;
-cols_c = cols_b;
-
-result_matrix = (int**)malloc(rows_c * sizeof(int*));
-for (i = 0; i < rows_c; i++) {
-    result_matrix[i] = (int*)malloc(cols_c * sizeof(int));
-}
-
-for (i = 0; i < MAX_THREADS; i++) {
-    thread_id[i] = i;
-    pthread_create(&threads[i], NULL, multiply, (void*)&thread_id[i]);
-}
-
-for (i = 0; i < MAX_THREADS; i++) {
+  }
+  for (int i = 0; i < N; i++) {
+    for (int j = 0; j < M; j++) {
+      b[i][j] = i + j;
+    }
+  }
+  struct timeval start_time, end_time;
+  gettimeofday(&start_time, NULL);
+  for (int i = 0; i < NUM_THREADS; i++) {
+    int* thread_id = (int*) malloc(sizeof(int));
+    *thread_id = i;
+    pthread_create(&threads[i], NULL, multiply, thread_id);
+  }
+  for (int i = 0; i < NUM_THREADS; i++) {
     pthread_join(threads[i], NULL);
-}
-
-end_time = clock();
-elapsed_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
-
-printf("Resultant matrix C:\n");
-for (i = 0; i < rows_c; i++) {
-    for (j = 0; j < cols_c; j++) {
-        printf("%d ", result_matrix[i][j]);
-    }
-    printf("\n");
-}
-
-printf("Time taken to compute the multiplication: %lf seconds\n", elapsed_time);
-
-for (i = 0; i < rows_a; i++) {
-    free(matrix_a[i]);
-}
-free(matrix_a);
-
-for (i = 0; i < rows_b; i++) {
-    free(matrix_b[i]);
-}
-free(matrix_b);
-
-for (i = 0; i < rows_c; i++) {
-    free(result_matrix[i]);
-}
-free(result_matrix);
-
-return 0;
+  }
+  gettimeofday(&end_time, NULL);
+  double elapsed_time = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
+  printf("Elapsed time = %lf seconds\n", elapsed_time);
+  return 0;
 }
